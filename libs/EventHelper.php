@@ -53,12 +53,12 @@ trait EventHelper
         $eid = @IPS_GetObjectIDByIdent($ident, $id);
         if ($eid === false) {
             $eid = IPS_CreateEvent(EVENTTYPE_SCHEDULE);
-            IPS_SetName($eid, $name);
+            IPS_SetName($eid, $this->Translate($name));
             IPS_SetIdent($eid, $ident);
             IPS_SetParent($eid, $id);
             IPS_SetPosition($eid, $pos);
             foreach ($datas as $key => $value) {
-                IPS_SetEventScheduleAction($eid, $key, $value[0], $value[1], $value[2]);
+                IPS_SetEventScheduleAction($eid, $key, $this->Translate($value[0]), $value[1], $value[2]);
             }
             // Mo - So (1 + 2 + 4 + 8 + 16 + 32 + 64) = 127; Mo - Fr (1 + 2 + 4 + 8 + 16) = 31; Sa + So (32 + 64) = 96
             IPS_SetEventScheduleGroup($eid, 0, 127);

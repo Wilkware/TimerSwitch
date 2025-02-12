@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/badge/Symcon-PHP--Modul-red.svg?style=flat-square)](https://www.symcon.de/service/dokumentation/entwicklerbereich/sdk-tools/sdk-php/)
 [![Product](https://img.shields.io/badge/Symcon%20Version-6.4-blue.svg?style=flat-square)](https://www.symcon.de/produkt/)
-[![Version](https://img.shields.io/badge/Modul%20Version-2.0.20220216-orange.svg?style=flat-square)](https://github.com/Wilkware/TimerSwitch)
+[![Version](https://img.shields.io/badge/Modul%20Version-3.1.20250212-orange.svg?style=flat-square)](https://github.com/Wilkware/TimerSwitch)
 [![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-green.svg?style=flat-square)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 [![Actions](https://img.shields.io/github/actions/workflow/status/wilkware/TimerSwitch/style.yml?branch=main&label=CheckStyle&style=flat-square)](https://github.com/Wilkware/TimerSwitch/actions)
 
@@ -35,6 +35,7 @@ Das nur um einige Anregungen zu geben. Wahrscheinlich gibt es da noch einiges me
   1. Aus => Ein- bzw. Ausschalten wird nicht vollzogen (externer Auslöser)
   2. Sonnengang => 8 mögliche Zeitpunkte wählbar (Sonnenaufgang und -untergang; zivile, nautische oder astronomische Dämmerung)
   3. Wochenplan => Steuerung über Zeitplan
+  4. Offset => frei definierbare Zeitpunkte über das Location Control
 * Zusätzlich bzw. ausschließlich kann ein Skript ausgeführt werden.
 * Schaltvariable muss nicht eine Aktionsvariable sein, sondern kann auch einfach eine boolesche Variable sein.
 * Option das Einschalten nur zu erlauben, wenn sich die Zeiten nicht überschneiden (zeitlich korrekte Abfolge, AN-vor-AUS).
@@ -69,8 +70,8 @@ An /Aus               | Schalter zum Aktivieren bzw. Deaktivieren der gesamten S
 
 Name                  | Beschreibung
 --------------------- | ---------------------------------
-Auslöser Einschalten  | Auswahlmöglichkeiten: Aus; Sonnenaufgang oder -untergang; zivile, nautische oder astronomische Dämmerung; Wochenplan (An)
-Auslöser Ausschalten  | Auswahlmöglichkeiten: ; Sonnenaufgang oder -untergang; zivile, nautische oder astronomische Dämmerung; Wochenplan (Aus)
+Auslöser Einschalten  | Auswahlmöglichkeiten: Aus; Sonnenaufgang oder -untergang; zivile, nautische oder astronomische Dämmerung; Wochenplan (An); Offsets
+Auslöser Ausschalten  | Auswahlmöglichkeiten: ; Sonnenaufgang oder -untergang; zivile, nautische oder astronomische Dämmerung; Wochenplan (Aus); Offsets
 (Zeitplan)            | Hinterlegung einer täglichen Uhrzeit für AN & AUS (Montag - Sonntag)
 
 > Geräte ...
@@ -102,6 +103,12 @@ Es ist keine weitere Steuerung oder gesonderte Darstellung integriert.
 Ein direkter Aufruf von öffentlichen Funktionen ist nicht notwendig!
 
 ### 8. Versionshistorie
+
+v3.1.20250212
+* _NEU_: Einstellungsmöglichkeiten um Offset-Variablen aus dem Location Control erweitert
+* _FIX_: Type Hinting für Funktions- und Methodenparameter (sowie Rückgabewerte) nachgezogen
+* _FIX_: Bibliotheks- bzw. Modulinfos vereinheitlicht
+* _FIX_: Dokumentation vereinheitlicht
 
 v3.0.20240908
 
