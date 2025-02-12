@@ -4,9 +4,7 @@
     "url": "https://wilkware.de/ip-symcon-module/zeitschaltuhr/",
     "type": 3,
     "vendor": "",
-    "aliases": [
-        "Timer"
-    ],
+    "aliases": [],
     "parentRequirements": [],
     "childRequirements": [],
     "implemented": [],
