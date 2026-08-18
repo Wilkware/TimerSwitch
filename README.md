@@ -4,7 +4,7 @@
 [![Product](https://img.shields.io/badge/Symcon%20Version-6.4-blue.svg?style=flat-square)](https://www.symcon.de/produkt/)
 [![Version](https://img.shields.io/badge/Modul%20Version-3.1.20250212-orange.svg?style=flat-square)](https://github.com/Wilkware/TimerSwitch)
 [![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-green.svg?style=flat-square)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
-[![Actions](https://img.shields.io/github/actions/workflow/status/wilkware/TimerSwitch/style.yml?branch=main&label=CheckStyle&style=flat-square)](https://github.com/Wilkware/TimerSwitch/actions)
+[![Actions](https://img.shields.io/github/actions/workflow/status/wilkware/TimerSwitch/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/Wilkware/TimerSwitch/actions)
 
 Dieses Modul ermöglicht das Schalten eines Gerätes (Variable und/oder Skripts) in Abhängigkeit von Uhrzeit und/oder des täglichen Sonnenganges.
 
@@ -13,8 +13,8 @@ Dieses Modul ermöglicht das Schalten eines Gerätes (Variable und/oder Skripts)
 1. [Funktionsumfang](#user-content-1-funktionsumfang)
 2. [Voraussetzungen](#user-content-2-voraussetzungen)
 3. [Installation](#user-content-3-installation)
-4. [Einrichten der Instanzen in IP-Symcon](#user-content-4-einrichten-der-instanzen-in-ip-symcon)
-5. [Statusvariablen und Profile](#user-content-5-statusvariablen-und-profile)
+4. [Einrichten der Instanzen in Symcon](#user-content-4-einrichten-der-instanzen-in-symcon)
+5. [Statusvariablen und Darstellungen](#user-content-5-statusvariablen-und-darstellungen)
 6. [Visualisierung](#user-content-6-visualisierung)
 7. [PHP-Befehlsreferenz](#user-content-7-php-befehlsreferenz)
 8. [Versionshistorie](#user-content-8-versionshistorie)
@@ -44,7 +44,7 @@ Das nur um einige Anregungen zu geben. Wahrscheinlich gibt es da noch einiges me
 
 ### 2. Voraussetzungen
 
-* IP-Symcon ab Version 6.4
+* Symcon ab Version 6.4
 
 ### 3. Installation
 
@@ -52,7 +52,7 @@ Das nur um einige Anregungen zu geben. Wahrscheinlich gibt es da noch einiges me
 * Alternativ Über das Modul-Control folgende URL hinzufügen.  
 `https://github.com/Wilkware/TimerSwitch` oder `git://github.com/Wilkware/TimerSwitch.git`
 
-### 4. Einrichten der Instanzen in IP-Symcon
+### 4. Einrichten der Instanzen in Symcon
 
 * Unter "Instanz hinzufügen" ist das _Zeitschaltuhr_-Modul unter dem Hersteller '(Geräte)' aufgeführt.
 
@@ -166,7 +166,7 @@ v1.0.20210322
 
 ## Entwickler
 
-Seit nunmehr über 10 Jahren fasziniert mich das Thema Haussteuerung. In den letzten Jahren betätige ich mich auch intensiv in der IP-Symcon Community und steuere dort verschiedenste Skript und Module bei. Ihr findet mich dort unter dem Namen @pitti ;-)
+Seit nunmehr über 10 Jahren fasziniert mich das Thema Haussteuerung. In den letzten Jahren betätige ich mich auch intensiv in der Symcon Community und steuere dort verschiedenste Skript und Module bei. Ihr findet mich dort unter dem Namen @pitti ;-)
 
 [![GitHub](https://img.shields.io/badge/GitHub-@wilkware-181717.svg?style=for-the-badge&logo=github)](https://wilkware.github.io/)
 

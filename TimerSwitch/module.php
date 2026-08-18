@@ -2,65 +2,136 @@
 
 declare(strict_types=1);
 
-// Generell funktions
+/** Generell funktions  */
 require_once __DIR__ . '/../libs/_traits.php';
+
+/** Namespaced traits */
+use Wilkware\TimerSwitch\DebugHelper;
+use Wilkware\TimerSwitch\EventHelper;
+use Wilkware\TimerSwitch\VariableHelper;
 
 /**
  * CLASS Timer Switch
  */
-class TimerSwitch extends IPSModule
+class TimerSwitch extends IPSModuleStrict
 {
+    // -------------------------------------------------------------------------
     // Traits
+    // -------------------------------------------------------------------------
+
     use DebugHelper;
     use EventHelper;
-    use ProfileHelper;
     use VariableHelper;
 
-    // Timing constant
-    private const TIMING_ON = 'On';
+    // -------------------------------------------------------------------------
+    // Timing Constants
+    // -------------------------------------------------------------------------
+
+    /** @var string Timming ON */
+    // private const TIMING_ON = 'On';
+
+    /** @var string Timming OFF */
     private const TIMING_OFF = 'Off';
+
+    /** @var string Timming Start */
     private const TIMING_START = 'TimingStart';
+
+    /** @var string Timming End */
     private const TIMING_END = 'TimingEnd';
+
+    /** @var string Timming Offset */
     private const TIMING_OFFSET = 'Offset';
+
+    /** @var string Weekly Sheduler ON */
     private const TIMING_WEEKLYON = 'WeeklySchedulOn';
+
+    /** @var string Weekly Sheduler OFF */
     private const TIMING_WEEKLYOFF = 'WeeklySchedulOff';
+
+    /** @var string Seperator Indicator */
     private const TIMING_SEPERATOR = 'None';
 
-    // Devices constant
-    private const DEVICE_ONE = 0;
-    private const DEVICE_MULTIPLE = 1;
+    // -------------------------------------------------------------------------
+    // Schedule Constants
+    // -------------------------------------------------------------------------
 
-    // Schedule constant
+    /** @var int Scheduler ON */
     private const SCHEDULE_ON = 1;
+
+    /** @var int Scheduler OFF */
     private const SCHEDULE_OFF = 2;
+
+    /** @var array<int,string> Scheduler Weekly */
     private const SCHEDULE_WEEKLY = ['Check', 'Timer', 'Delete', 'Copy'];
+
+    /** @var array<int,string> Scheduler Days */
     private const SCHEDULE_DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'So'];
 
-    // Location Control
+    // -------------------------------------------------------------------------
+    // Constants
+    // -------------------------------------------------------------------------
+
+    /** @var int Min IPS Object ID  */
+    private const IPS_MIN_ID = 10000;
+
+    /** @var int Device One */
+    private const DEVICE_ONE = 0;
+
+    /** @var int Device Multiple  */
+    private const DEVICE_MULTIPLE = 1;
+
+    /** @var string Location Control GUID */
     private const LOCATION_GUID = '{45E97A63-F870-408A-B259-2933F7EABF74}';
+
+    // -------------------------------------------------------------------------
+    // Presentations
+    // -------------------------------------------------------------------------
+
+    /**
+     * @var array<string,mixed> Presentation (Switch)
+     */
+    private const LTM_PRESENTATION_SWITCH = [
+        'PRESENTATION'   => VARIABLE_PRESENTATION_SWITCH,
+        'USE_ICON_FALSE' => false,
+        'USAGE_TYPE'     => 0,
+        'ICON_TRUE'      => 'power-off',
+        'ICON_FALSE'     => 'power-off',
+        'GLOW_INTENSITY' => 50,
+        'GLOW_COLOR'     => 16771899,
+    ];
+
+    // -------------------------------------------------------------------------
+    // Methods
+    // -------------------------------------------------------------------------
 
     /**
      * In contrast to Construct, this function is called only once when creating the instance and starting IP-Symcon.
      * Therefore, status variables and module properties which the module requires permanently should be created here.
+     *
+     * @return void
      */
-    public function Create()
+    public function Create(): void
     {
         //Never delete this line!
         parent::Create();
 
         // Instance
         $this->RegisterPropertyBoolean('InstanceActive', true);
+
         // Timming
         $this->RegisterPropertyString('TimingStart', 'Sunrise');
         $this->RegisterPropertyString('TimingEnd', 'Sunset');
+
         // Device
         $this->RegisterPropertyInteger('DeviceNumber', 0);
         $this->RegisterPropertyInteger('DeviceVariable', 0);
         $this->RegisterPropertyString('DeviceVariables', '[]');
         $this->RegisterPropertyInteger('DeviceScript', 0);
+
         // Settings
         $this->RegisterPropertyBoolean('SettingsTime', false);
         $this->RegisterPropertyBoolean('SettingsSwitch', false);
+
         // Schedule
         foreach (self::SCHEDULE_DAYS as $day) {
             $this->RegisterPropertyBoolean(self::TIMING_START . 'Check' . $day, true);
@@ -82,8 +153,10 @@ class TimerSwitch extends IPSModule
     /**
      * This function is called when deleting the instance during operation and when updating via "Module Control".
      * The function is not called when exiting IP-Symcon.
+     *
+     * @return void
      */
-    public function Destroy()
+    public function Destroy(): void
     {
         //Never delete this line!
         parent::Destroy();
@@ -94,9 +167,9 @@ class TimerSwitch extends IPSModule
      * This way, content can be generated dynamically.
      * In this case, the "form.json" on the file system is completely ignored.
      *
-     * @return JSON Content of the configuration page
+     * @return string Content of the configuration page.
      */
-    public function GetConfigurationForm()
+    public function GetConfigurationForm(): string
     {
         // Get Form
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
@@ -104,13 +177,13 @@ class TimerSwitch extends IPSModule
         // add self defined offsets
         $options = [['caption' => '------------------------------', 'value' => 'None']];
         $lcs = IPS_GetInstanceListByModuleID(self::LOCATION_GUID);
-        $this->SendDebug(__FUNCTION__, $lcs);
+        $this->LogDebug(__FUNCTION__, $lcs);
         if (isset($lcs[0])) {
             $childs = IPS_GetChildrenIDs($lcs[0]);
-            $this->SendDebug(__FUNCTION__, $childs);
+            $this->LogDebug(__FUNCTION__, $childs);
             foreach ($childs as $cid) {
                 $obj = IPS_GetObject($cid);
-                $this->SendDebug(__FUNCTION__, $obj['ObjectIdent']);
+                $this->LogDebug(__FUNCTION__, $obj['ObjectIdent']);
                 if ($this->StartsWith($obj['ObjectIdent'], self::TIMING_OFFSET)) {
                     $options[] = ['caption' => $obj['ObjectName'], 'value' => $obj['ObjectIdent']];
                 }
@@ -155,10 +228,11 @@ class TimerSwitch extends IPSModule
     }
 
     /**
-     * Is executed when "Apply" is pressed on the configuration page and immediately
-     * after the instance has been created.
+     * Is executed when "Apply" is pressed on the configuration page and immediately after the instance has been created.
+     *
+     * @return void
      */
-    public function ApplyChanges()
+    public function ApplyChanges(): void
     {
         // Disable Timer
         $this->SetTimerInterval('ScheduleTimerOn', 0);
@@ -199,9 +273,7 @@ class TimerSwitch extends IPSModule
         }
         $variable = $this->ReadPropertyInteger('DeviceVariable');
         if (IPS_VariableExists($variable)) {
-            if (IPS_VariableExists($variable)) {
-                $this->RegisterReference($variable);
-            }
+            $this->RegisterReference($variable);
         }
 
         //Register update messages
@@ -280,9 +352,9 @@ class TimerSwitch extends IPSModule
 
         // Write
         $this->WriteAttributeInteger('ConditionalStart', $cs);
-        $this->SendDebug(__FUNCTION__, $start . ' = ' . $cs);
+        $this->LogDebug(__FUNCTION__, $start . ' = ' . $cs);
         $this->WriteAttributeInteger('ConditionalEnd', $ce);
-        $this->SendDebug(__FUNCTION__, $end . ' = ' . $ce);
+        $this->LogDebug(__FUNCTION__, $end . ' = ' . $ce);
 
         // Register Start
         if ($cs > 0) {
@@ -300,11 +372,11 @@ class TimerSwitch extends IPSModule
             $ct = 1;
         }
         $this->WriteAttributeInteger('ConditionalTime', $ct);
-        $this->SendDebug(__FUNCTION__, 'ConditionalTime = ' . $ct);
+        $this->LogDebug(__FUNCTION__, 'ConditionalTime = ' . $ct);
 
         // Aditionally Switch
         $switch = $this->ReadPropertyBoolean('SettingsSwitch');
-        $this->MaintainVariable('switch_proxy', $this->Translate('Switch'), VARIABLETYPE_BOOLEAN, '~Switch', 0, $switch);
+        $this->MaintainVariable('switch_proxy', $this->Translate('Switch'), VARIABLETYPE_BOOLEAN, self::LTM_PRESENTATION_SWITCH, 0, $switch);
         if ($switch) {
             $this->EnableAction('switch_proxy');
         }
@@ -318,21 +390,23 @@ class TimerSwitch extends IPSModule
 
     /**
      * The content of the function can be overwritten in order to carry out own reactions to certain messages.
-     * The function is only called for registered Message IDs/Sender IDs combinations.
+     * The function is only called for registered MessageIDs/SenderIDs combinations.
      *
      * data[0] = new value
      * data[1] = value changed?
      * data[2] = old value
      * data[3] = timestamp.
      *
-     * @param integer $timestamp Continuous counter timestamp
-     * @param integer $sender ID of the sender
-     * @param integer $message ID of the message
-     * @param array $data Data of the message
+     * @param int   $timestamp Continuous counter timestamp
+     * @param int   $sender    Sender ID
+     * @param int   $message   ID of the message
+     * @param array{0:mixed,1:bool,2:mixed,3:int} $data Data of the message
+     *
+     * @return void
      */
-    public function MessageSink($timestamp, $sender, $message, $data)
+    public function MessageSink(int $timestamp, int $sender, int $message, array $data): void
     {
-        // $this->SendDebug(__FUNCTION__, 'Sender: '. $sender . 'Data: ' . print_r($data, true), 0);
+        // $this->LogDebug(__FUNCTION__, 'Sender: '. $sender . 'Data: ' . print_r($data, true), 0);
         switch ($message) {
             case VM_UPDATE:
                 $vid = 0;
@@ -353,14 +427,14 @@ class TimerSwitch extends IPSModule
                 // Safety Check
                 if (($sender != $vid) || ($sender != $sid) || ($sender != $eid)) {
                     if (($sender == $vid) && ($data[1] == true)) {
-                        $this->SendDebug(__FUNCTION__, $sender . ': device variable changed');
+                        $this->LogDebug(__FUNCTION__, $sender . ': device variable changed');
                         $this->SwitchState($data[0]);
                     } elseif ($data[1] == true) {
-                        $this->SendDebug(__FUNCTION__, $sender . ': conditional start changed');
+                        $this->LogDebug(__FUNCTION__, $sender . ': conditional start changed');
                         $this->Schedule($sender);
                     }
                 } else {
-                    $this->SendDebug(__FUNCTION__, $sender . ' unknown!');
+                    $this->LogDebug(__FUNCTION__, $sender . ' unknown!');
                 }
                 break;
         }
@@ -369,13 +443,15 @@ class TimerSwitch extends IPSModule
     /**
      * Is called when, for example, a button is clicked in the visualization.
      *
-     *  @param string $ident Ident of the variable
-     *  @param string $value The value to be set
+     * @param string $ident Ident of the variable
+     * @param mixed $value The value to be set
+     *
+     * @return void
      */
-    public function RequestAction($ident, $value)
+    public function RequestAction(string $ident, mixed $value): void
     {
         // Debug output
-        $this->SendDebug(__FUNCTION__, $ident . ' => ' . $value);
+        $this->LogDebug(__FUNCTION__, $ident . ' => ' . $value);
         switch ($ident) {
             case 'switch_proxy':
                 if ($this->SwitchDevice($value)) {
@@ -385,47 +461,48 @@ class TimerSwitch extends IPSModule
             default:
                 eval('$this->' . $ident . '(\'' . $value . '\');');
         }
-        return true;
     }
 
     /**
      * Schedule
      *
      * @param integer $value Action value (ON=1, OFF=2)
+     *
+     * @return void
      */
-    public function Schedule(int $value)
+    public function Schedule(int $value): void
     {
-        $this->SendDebug(__FUNCTION__, 'Value: ' . $value);
+        $this->LogDebug(__FUNCTION__, 'Value: ' . $value);
         // Mode?
         $cs = $this->ReadAttributeInteger('ConditionalStart');
         $ce = $this->ReadAttributeInteger('ConditionalEnd');
         $ct = $this->ReadAttributeInteger('ConditionalTime');
-        $this->SendDebug(__FUNCTION__, 'Conditional is :' . $cs . ', ' . $ce . ', ' . $ct);
+        $this->LogDebug(__FUNCTION__, 'Conditional is :' . $cs . ', ' . $ce . ', ' . $ct);
 
         // Start is OFF
         if (($cs == -1) && ($value == self::SCHEDULE_ON)) {
             // never happend!!!!
-            $this->SendDebug(__FUNCTION__, 'Start Trigger is off');
+            $this->LogDebug(__FUNCTION__, 'Start Trigger is off');
             return;
         }
         // End is OFF
         if (($ce == -1) && ($value == self::SCHEDULE_OFF)) {
             // never happend!!!!
-            $this->SendDebug(__FUNCTION__, 'End Trigger is off');
+            $this->LogDebug(__FUNCTION__, 'End Trigger is off');
             return;
         }
 
         // Start is Time(Clock)
         if (($cs == 0) && ($value == self::SCHEDULE_ON)) {
-            $this->SendDebug(__FUNCTION__, 'Start timer switch');
+            $this->LogDebug(__FUNCTION__, 'Start timer switch');
             $switch = true;
             // Check was OFF before ON (only for conditional timing setup, means ce is set)
             if ($ct > 0 && $ce > 0) {
                 $mid = mktime(24, 0, 0);
                 $int = GetValue($ce);
-                $this->SendDebug(__FUNCTION__, 'Check was OFF before ON: ' . $mid . ' < ' . $int);
+                $this->LogDebug(__FUNCTION__, 'Check was OFF before ON: ' . $mid . ' < ' . $int);
                 if ($mid < $int) {
-                    $this->SendDebug(__FUNCTION__, 'OFF wass before ON: ' . boolval($mid < $int));
+                    $this->LogDebug(__FUNCTION__, 'OFF wass before ON: ' . boolval($mid < $int));
                     $switch = false;
                 }
             }
@@ -438,7 +515,7 @@ class TimerSwitch extends IPSModule
         }
         // End is Time(Clock)
         if (($ce == 0) && ($value == self::SCHEDULE_OFF)) {
-            $this->SendDebug(__FUNCTION__, 'End timer switch');
+            $this->LogDebug(__FUNCTION__, 'End timer switch');
             if ($this->SwitchDevice(false)) {
                 $this->SwitchState(false);
             }
@@ -446,7 +523,7 @@ class TimerSwitch extends IPSModule
 
         // Start conditional switching
         if ($cs == $value) {
-            $this->SendDebug(__FUNCTION__, 'Start conditional-Switch: ' . $value);
+            $this->LogDebug(__FUNCTION__, 'Start conditional-Switch: ' . $value);
             $switch = true;
             // Check was OFF before ON (only for conditional timing setup; means ce is clock(0))
             if ($ct > 0 && $ce == 0) {
@@ -454,9 +531,9 @@ class TimerSwitch extends IPSModule
                 $lts = explode(':', $buf);
                 $mid = mktime(24, 0, 0);
                 $int = $lts[1];
-                $this->SendDebug(__FUNCTION__, 'Check was OFF before ON: ' . $mid . ' < ' . $int);
+                $this->LogDebug(__FUNCTION__, 'Check was OFF before ON: ' . $mid . ' < ' . $int);
                 if ($mid < $int) {
-                    $this->SendDebug(__FUNCTION__, 'OFF was before ON: ' . boolval($mid < $int));
+                    $this->LogDebug(__FUNCTION__, 'OFF was before ON: ' . boolval($mid < $int));
                     $switch = false;
                 }
             }
@@ -469,7 +546,7 @@ class TimerSwitch extends IPSModule
         }
         // End conditional switching
         if ($ce == $value) {
-            $this->SendDebug(__FUNCTION__, 'End conditional-Switch: ' . $value);
+            $this->LogDebug(__FUNCTION__, 'End conditional-Switch: ' . $value);
             if ($this->SwitchDevice(false)) {
                 $this->SwitchState(false);
             }
@@ -480,13 +557,119 @@ class TimerSwitch extends IPSModule
     }
 
     /**
+     * User has select an new number of devices.
+     *
+     * @param string $value The selected value.
+     *
+     * @return void
+     */
+    protected function OnDeviceNumber(string $value): void
+    {
+        $this->LogDebug(__FUNCTION__, 'Value: ' . $value);
+        $this->UpdateFormField('DeviceVariable', 'visible', (intval($value) == self::DEVICE_ONE));
+        $this->UpdateFormField('DeviceVariables', 'visible', (intval($value) == self::DEVICE_MULTIPLE));
+    }
+
+    /**
+     * User has select an new start trigger.
+     *
+     * @param string $value The selected value.
+     *
+     * @return void
+     */
+    protected function OnTimingStart(string $value): void
+    {
+        $this->LogDebug(__FUNCTION__, 'Value: ' . $value);
+        if ($value == self::TIMING_SEPERATOR) {
+            $this->UpdateFormField(self::TIMING_START, 'value', self::TIMING_OFF);
+        }
+        $this->WeeklySchedule(self::TIMING_START, ($value == self::TIMING_WEEKLYON));
+    }
+
+    /**
+     * User has select an new end trigger.
+     *
+     * @param string $value The selected value.
+     *
+     * @return void
+     */
+    protected function OnTimingEnd(string $value)
+    {
+        $this->LogDebug(__FUNCTION__, 'Value: ' . $value);
+        if ($value == self::TIMING_SEPERATOR) {
+            $this->UpdateFormField(self::TIMING_END, 'value', self::TIMING_OFF);
+        }
+        $this->WeeklySchedule(self::TIMING_END, ($value == self::TIMING_WEEKLYOFF));
+    }
+
+    /**
+     * User has clickt on start delete button.
+     *
+     * @param string $name The button field name.
+     *
+     * @return void
+     */
+    protected function OnStartDelete(string $name): void
+    {
+        $this->LogDebug(__FUNCTION__, 'Name: ' . $name);
+        $this->UpdateFormField($name, 'value', '{"hour":6,"minute":0,"second":0}');
+    }
+
+    /**
+     * User has clickt on end delete button.
+     *
+     * @param string $name The button field name.
+     *
+     * @return void
+     */
+    protected function OnEndDelete(string $name): void
+    {
+        $this->LogDebug(__FUNCTION__, 'Name: ' . $name);
+        $this->UpdateFormField($name, 'value', '{"hour":18,"minute":0,"second":0}');
+    }
+
+    /**
+     * User has clickt on start copy button.
+     *
+     * @param string $value The copy value.
+     *
+     * @return void
+     */
+    protected function OnStartCopy(string $value): void
+    {
+        $this->LogDebug(__FUNCTION__, 'Value: ' . $value);
+        $day = substr($value, 0, 2);
+        $time = substr($value, 2);
+        $this->LogDebug(__FUNCTION__, 'Day: ' . $day . ' Time: ' . $time);
+        $this->UpdateFormField(self::TIMING_START . 'Time' . $day, 'value', $time);
+    }
+
+    /**
+     * User has clickt on end copy button.
+     *
+     * @param string $value The copy value.
+     *
+     * @return void
+     */
+    protected function OnEndCopy(string $value): void
+    {
+        $this->LogDebug(__FUNCTION__, 'Value: ' . $value);
+        $day = substr($value, 0, 2);
+        $time = substr($value, 2);
+        $this->LogDebug(__FUNCTION__, 'Day: ' . $day . ' Time: ' . $time);
+        $this->UpdateFormField(self::TIMING_END . 'Time' . $day, 'value', $time);
+    }
+
+    /**
      * Switch device state.
      *
-     *  @param boolean $state True for ON, otherwise OFF.
+     * @param boolean $state True for ON, otherwise OFF.
+     *
+     * @return void
      */
-    private function SwitchState(bool $state)
+    private function SwitchState(bool $state): void
     {
-        $this->SendDebug(__FUNCTION__, 'New Value: ' . var_export($state, true));
+        $this->LogDebug(__FUNCTION__, 'New Value: ' . var_export($state, true));
         // Check shadow Variable
         if ($this->ReadPropertyBoolean('SettingsSwitch')) {
             $this->SetValueBoolean('switch_proxy', boolval($state));
@@ -496,21 +679,23 @@ class TimerSwitch extends IPSModule
     /**
      * Switch Variable/Script
      *
-     *  @param boolean $state ON/OFF.
+     * @param boolean $state ON/OFF.
+     *
+     * @return bool True if switch successful, otherwise false.
      */
-    private function SwitchDevice($state)
+    private function SwitchDevice($state): bool
     {
         $ret = true;
-        $this->SendDebug(__FUNCTION__, 'New State: ' . var_export($state, true));
+        $this->LogDebug(__FUNCTION__, 'New State: ' . var_export($state, true));
 
         // Check Script
         $ds = $this->ReadPropertyInteger('DeviceScript');
         if ($ds != 0) {
             if (IPS_ScriptExists($ds)) {
                 $rs = IPS_RunScriptEx($ds, ['State' => $state]);
-                $this->SendDebug(__FUNCTION__, 'RundScript: ' . $rs);
+                $this->LogDebug(__FUNCTION__, 'RundScript: ' . $rs);
             } else {
-                $this->SendDebug(__FUNCTION__, 'Script #' . $ds . ' doesnt exist!');
+                $this->LogDebug(__FUNCTION__, 'Script #' . $ds . ' doesnt exist!');
             }
         }
 
@@ -521,10 +706,10 @@ class TimerSwitch extends IPSModule
             if ($dv != 0) {
                 $ret = @RequestAction($dv, boolval($state));
                 if ($ret === false) {
-                    $this->SendDebug(__FUNCTION__, 'Device #' . $dv . ' could not be switched by RequestAction!');
+                    $this->LogDebug(__FUNCTION__, 'Device #' . $dv . ' could not be switched by RequestAction!');
                     $ret = @SetValueBoolean($dv, boolval($state));
                     if ($ret === false) {
-                        $this->SendDebug(__FUNCTION__, 'Device could not be switched by Boolean!');
+                        $this->LogDebug(__FUNCTION__, 'Device could not be switched by Boolean!');
                     }
                 }
                 if ($ret === false) {
@@ -539,7 +724,7 @@ class TimerSwitch extends IPSModule
             foreach ($variables as $variable) {
                 $ret = @RequestAction($variable['VariableID'], boolval($state));
                 if ($ret === false) {
-                    $this->SendDebug(__FUNCTION__, 'Device #' . $variable['VariableID'] . ' could not be switched by RequestAction!');
+                    $this->LogDebug(__FUNCTION__, 'Device #' . $variable['VariableID'] . ' could not be switched by RequestAction!');
                     $ret = false;
                 }
             }
@@ -554,51 +739,50 @@ class TimerSwitch extends IPSModule
      * Get variable status.
      *
      * @param int $vid The variable ID.
+     *
+     * @return string Status message
      */
-    private function GetVariableStatus(int $vid)
+    private function GetVariableStatus(int $vid): string
     {
         if (!IPS_VariableExists($vid)) {
             return $this->Translate('Missing');
-        } else {
-            $var = IPS_GetVariable($vid);
-            switch ($var['VariableType']) {
-                case VARIABLETYPE_BOOLEAN:
-                    if ($var['VariableCustomProfile'] != '') {
-                        $profile = $var['VariableCustomProfile'];
-                    } else {
-                        $profile = $var['VariableProfile'];
-                    }
-                    if (!IPS_VariableProfileExists($profile)) {
-                        return $this->Translate('Profile required');
-                    }
-                    // No break, because for Boolean, Integer & Float same treatment
-                    // FIXME: No break. Add additional comment above this line if intentional!
-                    // No break. Add additional comment above this line if intentional!
-                case VARIABLETYPE_INTEGER:
-                    // No break, because for Integer & Float same treatment
-                case VARIABLETYPE_FLOAT:
-                    if ($var['VariableCustomAction'] != 0) {
-                        $action = $var['VariableCustomAction'];
-                    } else {
-                        $action = $var['VariableAction'];
-                    }
-                    if (!($action > 10000)) {
-                        return $this->Translate('Action required');
-                    }
-                    return 'OK';
-                default:
-                    return $this->Translate('Bool/Int/Float required');
+        }
+
+        $var = IPS_GetVariable($vid);
+
+        if (!in_array($var['VariableType'], [VARIABLETYPE_BOOLEAN, VARIABLETYPE_INTEGER, VARIABLETYPE_FLOAT], true)) {
+            return $this->Translate('Bool/Int/Float required');
+        }
+
+        if ($var['VariableType'] === VARIABLETYPE_BOOLEAN) {
+            $profile = $var['VariableCustomProfile'] !== ''
+                ? $var['VariableCustomProfile']
+                : $var['VariableProfile'];
+
+            if (!IPS_VariableProfileExists($profile)) {
+                return $this->Translate('Profile required');
             }
         }
+
+        $action = $var['VariableCustomAction'] !== 0
+            ? $var['VariableCustomAction']
+            : $var['VariableAction'];
+
+        if ($action <= self::IPS_MIN_ID) {
+            return $this->Translate('Action required');
+        }
+
+        return 'OK';
     }
 
     /**
      * Returns the status variablen ID of the Location Control by given ident.
      *
      * @param string $ident Ident of the Location Control Variable
+     *
      * @return integer Variablen ID
      */
-    private function GetLocationID(string $ident)
+    private function GetLocationID(string $ident): int
     {
         $LCs = IPS_GetInstanceListByModuleID(self::LOCATION_GUID);
         if (isset($LCs[0])) {
@@ -607,7 +791,7 @@ class TimerSwitch extends IPSModule
                 return $id;
             }
         }
-        $this->SendDebug(__FUNCTION__, 'No Location Control found!');
+        $this->LogDebug(__FUNCTION__, 'No Location Control found!');
         return 0;
     }
 
@@ -617,27 +801,27 @@ class TimerSwitch extends IPSModule
      * @param string $name Name of the trigger
      * @param bool $active True for activate, otherwise false.
      */
-    private function WeeklySchedule(string $name, bool $active)
+    private function WeeklySchedule(string $name, bool $active): void
     {
-        $this->SendDebug(__FUNCTION__, $name . ': ' . var_export($active, true));
+        $this->LogDebug(__FUNCTION__, $name . ': ' . var_export($active, true));
         foreach (self::SCHEDULE_DAYS as $day) {
-            $this->UpdateFormField($name . 'Check' . $day, 'enabled', $active);
-            $this->UpdateFormField($name . 'Time' . $day, 'enabled', $active);
-            $this->UpdateFormField($name . 'Delete' . $day, 'enabled', $active);
-            $this->UpdateFormField($name . 'Copy' . $day, 'enabled', $active);
+            foreach (self::SCHEDULE_WEEKLY as $weekly) {
+                $this->UpdateFormField($name . $weekly . $day, 'enabled', $active);
+            }
         }
     }
 
     /**
      * Calculate and setup the next Timer.
      *
+     * @return void
      */
-    private function CalculateTimer()
+    private function CalculateTimer(): void
     {
         // read setup
         $start = $this->ReadPropertyString('TimingStart');
         $end = $this->ReadPropertyString('TimingEnd');
-        $this->SendDebug(__FUNCTION__, 'Start: ' . $start . ' End: ' . $end);
+        $this->LogDebug(__FUNCTION__, 'Start: ' . $start . ' End: ' . $end);
         // buffer setup
         $ts = 0;
         $te = 0;
@@ -726,97 +910,7 @@ class TimerSwitch extends IPSModule
             }
         }
         $this->SetBuffer('schedule', ($ts > 0 ? $ts + $now : 0) . ':' . ($te > 0 ? $te + $now : 0));
-        $this->SendDebug(__FUNCTION__, 'Buffer: ' . $this->GetBuffer('schedule'));
-    }
-
-    /**
-     * User has select an new number of devices.
-     *
-     * @param string $value The selected value.
-     */
-    private function OnDeviceNumber(string $value)
-    {
-        $this->SendDebug(__FUNCTION__, 'Value: ' . $value);
-        $this->UpdateFormField('DeviceVariable', 'visible', (intval($value) == self::DEVICE_ONE));
-        $this->UpdateFormField('DeviceVariables', 'visible', (intval($value) == self::DEVICE_MULTIPLE));
-    }
-
-    /**
-     * User has select an new start trigger.
-     *
-     * @param string $value The selected value.
-     */
-    private function OnTimingStart(string $value)
-    {
-        $this->SendDebug(__FUNCTION__, 'Value: ' . $value);
-        if ($value == self::TIMING_SEPERATOR) {
-            $this->UpdateFormField(self::TIMING_START, 'value', self::TIMING_OFF);
-        }
-        $this->WeeklySchedule(self::TIMING_START, ($value == self::TIMING_WEEKLYON));
-    }
-
-    /**
-     * User has select an new end trigger.
-     *
-     * @param string $value The selected value.
-     */
-    private function OnTimingEnd(string $value)
-    {
-        $this->SendDebug(__FUNCTION__, 'Value: ' . $value);
-        if ($value == self::TIMING_SEPERATOR) {
-            $this->UpdateFormField(self::TIMING_END, 'value', self::TIMING_OFF);
-        }
-        $this->WeeklySchedule(self::TIMING_END, ($value == self::TIMING_WEEKLYOFF));
-    }
-
-    /**
-     * User has clickt on start delete button.
-     *
-     * @param string $name The button field name.
-     */
-    private function OnStartDelete(string $name)
-    {
-        $this->SendDebug(__FUNCTION__, 'Name: ' . $name);
-        $this->UpdateFormField($name, 'value', '{"hour":6,"minute":0,"second":0}');
-    }
-
-    /**
-     * User has clickt on end delete button.
-     *
-     * @param string $name The button field name.
-     */
-    private function OnEndDelete(string $name)
-    {
-        $this->SendDebug(__FUNCTION__, 'Name: ' . $name);
-        $this->UpdateFormField($name, 'value', '{"hour":18,"minute":0,"second":0}');
-    }
-
-    /**
-     * User has clickt on start copy button.
-     *
-     * @param string $value The copy value.
-     */
-    private function OnStartCopy(string $value)
-    {
-        $this->SendDebug(__FUNCTION__, 'Value: ' . $value);
-        $day = substr($value, 0, 2);
-        $time = substr($value, 2);
-        $this->SendDebug(__FUNCTION__, 'Day: ' . $day . ' Time: ' . $time);
-        $this->UpdateFormField(self::TIMING_START . 'Time' . $day, 'value', $time);
-    }
-
-    /**
-     * User has clickt on end copy button.
-     *
-     * @param string $value The copy value.
-     */
-    private function OnEndCopy(string $value)
-    {
-        $this->SendDebug(__FUNCTION__, 'Value: ' . $value);
-        $day = substr($value, 0, 2);
-        $time = substr($value, 2);
-        $this->SendDebug(__FUNCTION__, 'Day: ' . $day . ' Time: ' . $time);
-        $this->UpdateFormField(self::TIMING_END . 'Time' . $day, 'value', $time);
+        $this->LogDebug(__FUNCTION__, 'Buffer: ' . $this->GetBuffer('schedule'));
     }
 
     /**
@@ -824,8 +918,10 @@ class TimerSwitch extends IPSModule
      *
      * @param string $haystack The string to search in.
      * @param string $needle The substring to search for in the haystack.
+     *
+     * @return bool Returns true if haystack begins with needle, false otherwise.
      */
-    private function StartsWith(string $haystack, string $needle)
+    private function StartsWith(string $haystack, string $needle): bool
     {
         return (string) $needle !== '' && strncmp($haystack, $needle, strlen($needle)) === 0;
     }
