@@ -1,5 +1,6 @@
 # Zeitschaltuhr (Timer Switch)
 
+[![Home](https://img.shields.io/badge/Home-wilkware.de-0b1830.svg?style=flat-square)](https://wilkware.de/module/zeitschaltuhr/)
 [![Version](https://img.shields.io/badge/Symcon-PHP--Modul-red.svg?style=flat-square)](https://www.symcon.de/service/dokumentation/entwicklerbereich/sdk-tools/sdk-php/)
 [![Product](https://img.shields.io/badge/Symcon%20Version-6.4-blue.svg?style=flat-square)](https://www.symcon.de/produkt/)
 [![Version](https://img.shields.io/badge/Modul%20Version-3.1.20250212-orange.svg?style=flat-square)](https://github.com/Wilkware/TimerSwitch)
@@ -13,11 +14,12 @@ Dieses Modul ermöglicht das Schalten eines Gerätes (Variable und/oder Skripts)
 1. [Funktionsumfang](#user-content-1-funktionsumfang)
 2. [Voraussetzungen](#user-content-2-voraussetzungen)
 3. [Installation](#user-content-3-installation)
-4. [Einrichten der Instanzen in Symcon](#user-content-4-einrichten-der-instanzen-in-symcon)
-5. [Statusvariablen und Darstellungen](#user-content-5-statusvariablen-und-darstellungen)
-6. [Visualisierung](#user-content-6-visualisierung)
-7. [PHP-Befehlsreferenz](#user-content-7-php-befehlsreferenz)
-8. [Versionshistorie](#user-content-8-versionshistorie)
+4. [Einrichtung](#user-content-4-einrichtung)
+5. [Statusvariablen](#user-content-5-statusvariablen)
+6. [Darstellungen](#user-content-6-darstellungen)
+7. [Visualisierung](#user-content-7-visualisierung)
+8. [Befehlsreferenz](#user-content-8-befehlsreferenz)
+9. [Versionshistorie](#user-content-9-versionshistorie)
 
 ### 1. Funktionsumfang
 
@@ -49,12 +51,12 @@ Das nur um einige Anregungen zu geben. Wahrscheinlich gibt es da noch einiges me
 ### 3. Installation
 
 * Über den Modul Store das Modul _Zeitschaltuhr_ installieren.
-* Alternativ Über das Modul-Control folgende URL hinzufügen.  
+* Alternativ über das Modul Control folgende URL hinzufügen.  
 `https://github.com/Wilkware/TimerSwitch` oder `git://github.com/Wilkware/TimerSwitch.git`
 
-### 4. Einrichten der Instanzen in Symcon
+### 4. Einrichtung
 
-* Unter "Instanz hinzufügen" ist das _Zeitschaltuhr_-Modul unter dem Hersteller '(Geräte)' aufgeführt.
+* Unter 'Instanz hinzufügen' ist das _Zeitschaltuhr_-Modul unter dem Hersteller '(Geräte)' aufgeführt.
 
 __Konfigurationsseite__:
 
@@ -66,7 +68,7 @@ Name                  | Beschreibung
 --------------------- | ---------------------------------
 An /Aus               | Schalter zum Aktivieren bzw. Deaktivieren der gesamten Schaltung, z.B. Weihnachtsbeleuchtung nur im Winter ;-)
 
-> Zeitssteuerung ...
+> Zeitsteuerung ...
 
 Name                  | Beschreibung
 --------------------- | ---------------------------------
@@ -90,19 +92,33 @@ Name                  | Beschreibung
 Schaltvariable nur ein- bzw. ausschalten wenn zeitliche Abfolge korrekt ist (nur in Verbindung mit einem Wochenplan)! | true/false
 Zusätzlich noch eine normale Schaltervariable anlegen (z.B. für Webfront)? | true/false
 
-### 5. Statusvariablen und Profile
+### 5. Statusvariablen
 
-Es werden keine zusätzlichen Statusvariablen/Profile benötigt.
+Die Statusvariablen werden automatisch angelegt. Das Löschen einzelner kann zu Fehlfunktionen führen.
 
-### 6. Visualisierung
+Name                 | Typ     | Beschreibung
+-------------------- | ------- | ------------------------------
+Schalter             | Boolean | Proxy-Schalter zum direkten Schalten der Geräte (z.B. für die Visualisierung)
+
+_Hinweis:_ Die Variable wird nur angelegt, wenn in den Einstellungen die zusätzliche Schaltervariable aktiviert ist.
+
+### 6. Darstellungen
+
+Die Darstellungen werden direkt an den Statusvariablen hinterlegt, es werden keine Profile angelegt.
+
+Variable             | Darstellung   | Werte
+-------------------- | ------------- | ------------------------------
+Schalter             | Schalter      | An / Aus
+
+### 7. Visualisierung
 
 Es ist keine weitere Steuerung oder gesonderte Darstellung integriert.
 
-### 7. PHP-Befehlsreferenz
+### 8. Befehlsreferenz
 
 Ein direkter Aufruf von öffentlichen Funktionen ist nicht notwendig!
 
-### 8. Versionshistorie
+### 9. Versionshistorie
 
 v3.1.20250212
 * _NEU_: Einstellungsmöglichkeiten um Offset-Variablen aus dem Location Control erweitert
