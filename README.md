@@ -23,7 +23,7 @@ Dieses Modul ermöglicht das Schalten eines Gerätes (Variable und/oder Skripts)
 
 ### 1. Funktionsumfang
 
-Für eine einfache Zeitschaltung wäre dieses Modul normalerweise nicht notwendig. Die Erstellung einen Wochenplanes oder eines zyklischen Ereignisses ist mit IPS Bordmitteln recht einfach möglich. Interessant wird die Sache erst wenn man bedingtes und zyklisches Schalten verbinden möchte.
+Für eine einfache Zeitschaltung wäre dieses Modul normalerweise nicht notwendig. Die Erstellung eines Wochenplanes oder eines zyklischen Ereignisses ist mit Symcon-Bordmitteln recht einfach möglich. Interessant wird die Sache erst wenn man bedingtes und zyklisches Schalten verbinden möchte.
 Für eine solche Kombination gibt es eine Reihe von Anwendungsfälle, wie z.B. ...
 
 * Rollläden/Jalousien am Morgen zu einer definierten Zeit hochfahren (Arbeitstag unabhängig von Jahreszeit), aber abends zum Sonnenuntergang runterfahren
