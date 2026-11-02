@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-/** Generell funktions  */
+/** General functions */
 require_once __DIR__ . '/../libs/_traits.php';
 
 /** Namespaced traits */
 use Wilkware\TimerSwitch\DebugHelper;
-use Wilkware\TimerSwitch\EventHelper;
+use Wilkware\TimerSwitch\FormHelper;
 use Wilkware\TimerSwitch\VariableHelper;
 
 /**
@@ -20,36 +20,33 @@ class TimerSwitch extends IPSModuleStrict
     // -------------------------------------------------------------------------
 
     use DebugHelper;
-    use EventHelper;
+    use FormHelper;
     use VariableHelper;
 
     // -------------------------------------------------------------------------
     // Timing Constants
     // -------------------------------------------------------------------------
 
-    /** @var string Timming ON */
-    // private const TIMING_ON = 'On';
-
-    /** @var string Timming OFF */
+    /** @var string Timing OFF */
     private const TIMING_OFF = 'Off';
 
-    /** @var string Timming Start */
+    /** @var string Timing Start */
     private const TIMING_START = 'TimingStart';
 
-    /** @var string Timming End */
+    /** @var string Timing End */
     private const TIMING_END = 'TimingEnd';
 
-    /** @var string Timming Offset */
+    /** @var string Timing Offset */
     private const TIMING_OFFSET = 'Offset';
 
-    /** @var string Weekly Sheduler ON */
+    /** @var string Weekly Scheduler ON */
     private const TIMING_WEEKLYON = 'WeeklySchedulOn';
 
-    /** @var string Weekly Sheduler OFF */
+    /** @var string Weekly Scheduler OFF */
     private const TIMING_WEEKLYOFF = 'WeeklySchedulOff';
 
-    /** @var string Seperator Indicator */
-    private const TIMING_SEPERATOR = 'None';
+    /** @var string Separator Indicator */
+    private const TIMING_SEPARATOR = 'None';
 
     // -------------------------------------------------------------------------
     // Schedule Constants
@@ -62,7 +59,7 @@ class TimerSwitch extends IPSModuleStrict
     private const SCHEDULE_OFF = 2;
 
     /** @var array<int,string> Scheduler Weekly */
-    private const SCHEDULE_WEEKLY = ['Check', 'Timer', 'Delete', 'Copy'];
+    private const SCHEDULE_WEEKLY = ['Check', 'Time', 'Delete', 'Copy'];
 
     /** @var array<int,string> Scheduler Days */
     private const SCHEDULE_DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'So'];
@@ -70,9 +67,6 @@ class TimerSwitch extends IPSModuleStrict
     // -------------------------------------------------------------------------
     // Constants
     // -------------------------------------------------------------------------
-
-    /** @var int Min IPS Object ID  */
-    private const IPS_MIN_ID = 10000;
 
     /** @var int Device One */
     private const DEVICE_ONE = 0;
@@ -91,13 +85,16 @@ class TimerSwitch extends IPSModuleStrict
      * @var array<string,mixed> Presentation (Switch)
      */
     private const LTM_PRESENTATION_SWITCH = [
-        'PRESENTATION'   => VARIABLE_PRESENTATION_SWITCH,
-        'USE_ICON_FALSE' => false,
-        'USAGE_TYPE'     => 0,
-        'ICON_TRUE'      => 'power-off',
-        'ICON_FALSE'     => 'power-off',
-        'GLOW_INTENSITY' => 50,
-        'GLOW_COLOR'     => 16771899,
+        'ICON_TRUE'    => 'power-off',
+        'PRESENTATION' => VARIABLE_PRESENTATION_SWITCH,
+    ];
+
+    /**
+     * @var array<string,mixed> Presentation (Date/Time); presentation has no icon
+     */
+    private const LTM_PRESENTATION_NEXT = [
+        'DAY_OF_THE_WEEK' => true,
+        'PRESENTATION'    => VARIABLE_PRESENTATION_DATE_TIME,
     ];
 
     // -------------------------------------------------------------------------
@@ -118,7 +115,7 @@ class TimerSwitch extends IPSModuleStrict
         // Instance
         $this->RegisterPropertyBoolean('InstanceActive', true);
 
-        // Timming
+        // Timing
         $this->RegisterPropertyString('TimingStart', 'Sunrise');
         $this->RegisterPropertyString('TimingEnd', 'Sunset');
 
@@ -131,6 +128,8 @@ class TimerSwitch extends IPSModuleStrict
         // Settings
         $this->RegisterPropertyBoolean('SettingsTime', false);
         $this->RegisterPropertyBoolean('SettingsSwitch', false);
+        $this->RegisterPropertyBoolean('SettingsDirect', false);
+        $this->RegisterPropertyBoolean('SettingsNext', false);
 
         // Schedule
         foreach (self::SCHEDULE_DAYS as $day) {
@@ -148,18 +147,43 @@ class TimerSwitch extends IPSModuleStrict
         // Timer
         $this->RegisterTimer('ScheduleTimerOn', 0, 'LTM_Schedule(' . $this->InstanceID . ',' . self::SCHEDULE_ON . ');');
         $this->RegisterTimer('ScheduleTimerOff', 0, 'LTM_Schedule(' . $this->InstanceID . ',' . self::SCHEDULE_OFF . ');');
+
+        // Kernel
+        $this->RegisterMessage(0, IPS_KERNELSTARTED);
     }
 
     /**
-     * This function is called when deleting the instance during operation and when updating via "Module Control".
-     * The function is not called when exiting Symcon.
+     * Migrates the configuration of older versions.
      *
-     * @return void
+     * Up to v3.1 a single switch variable without an action was set directly.
+     * Keep this behaviour for existing instances which rely on it.
+     *
+     * @param string $json Configuration data as JSON
+     *
+     * @return string Migrated configuration data as JSON
      */
-    public function Destroy(): void
+    public function Migrate(string $json): string
     {
         //Never delete this line!
-        parent::Destroy();
+        parent::Migrate($json);
+
+        $data = json_decode($json);
+        if (!is_object($data) || !isset($data->configuration) || !is_object($data->configuration)) {
+            return $json;
+        }
+        $config = $data->configuration;
+        if (isset($config->SettingsDirect)) {
+            return $json;
+        }
+        if ((int) ($config->DeviceNumber ?? self::DEVICE_ONE) !== self::DEVICE_ONE) {
+            return $json;
+        }
+        $vid = (int) ($config->DeviceVariable ?? 0);
+        if (($vid > 0) && IPS_VariableExists($vid) && !HasAction($vid)) {
+            $config->SettingsDirect = true;
+            return json_encode($data);
+        }
+        return $json;
     }
 
     /**
@@ -173,6 +197,16 @@ class TimerSwitch extends IPSModuleStrict
     {
         // Get Form
         $form = json_decode(file_get_contents(__DIR__ . '/form.json'), true);
+
+        // Extract Version
+        $ins = IPS_GetInstance($this->InstanceID);
+        $mod = IPS_GetModule($ins['ModuleInfo']['ModuleID']);
+        $lib = IPS_GetLibrary($mod['LibraryID']);
+        $version = sprintf('v%s.%d', $lib['Version'], $lib['Build']);
+        $this->ModifyFormElement($form['actions'], 'Version', function (array &$element) use ($version): void
+        {
+            $element['caption'] = $version;
+        });
 
         // add self defined offsets
         $options = [['caption' => '------------------------------', 'value' => 'None']];
@@ -190,38 +224,48 @@ class TimerSwitch extends IPSModuleStrict
             }
         }
         if (count($options) > 1) {
-            $form['elements'][3]['items'][0]['items'][0]['options'] = array_merge($form['elements'][3]['items'][0]['items'][0]['options'], $options);
-            $form['elements'][3]['items'][0]['items'][2]['options'] = array_merge($form['elements'][3]['items'][0]['items'][2]['options'], $options);
+            foreach ([self::TIMING_START, self::TIMING_END] as $name) {
+                $this->ModifyFormElement($form['elements'], $name, function (array &$element) use ($options): void
+                {
+                    $element['options'] = array_merge($element['options'], $options);
+                });
+            }
         }
 
         // activate/deactivate times
-        $start = $this->ReadPropertyString('TimingStart');
-        $end = $this->ReadPropertyString('TimingEnd');
-        for ($d = 1; $d <= 7; $d++) {
-            for ($i = 0; $i <= 8; $i++) {
-                if ($form['elements'][3]['items'][$d]['items'][$i]['type'] != 'Label') {
-                    if ($this->StartsWith($form['elements'][3]['items'][$d]['items'][$i]['name'], self::TIMING_START)) {
-                        $form['elements'][3]['items'][$d]['items'][$i]['enabled'] = ($start == self::TIMING_WEEKLYON);
-                    }
-                    if ($this->StartsWith($form['elements'][3]['items'][$d]['items'][$i]['name'], self::TIMING_END)) {
-                        $form['elements'][3]['items'][$d]['items'][$i]['enabled'] = ($end == self::TIMING_WEEKLYOFF);
-                    }
+        $weekly = [
+            self::TIMING_START => ($this->ReadPropertyString('TimingStart') == self::TIMING_WEEKLYON),
+            self::TIMING_END   => ($this->ReadPropertyString('TimingEnd') == self::TIMING_WEEKLYOFF),
+        ];
+        foreach ($weekly as $prefix => $enabled) {
+            foreach (self::SCHEDULE_DAYS as $day) {
+                foreach (self::SCHEDULE_WEEKLY as $part) {
+                    $this->ModifyFormElement($form['elements'], $prefix . $part . $day, function (array &$element) use ($enabled): void
+                    {
+                        $element['enabled'] = $enabled;
+                    });
                 }
             }
         }
 
         // number of devices
         $number = $this->ReadPropertyInteger('DeviceNumber');
-        $form['elements'][4]['items'][1]['visible'] = ($number === self::DEVICE_ONE);
-        $form['elements'][4]['items'][2]['visible'] = ($number === self::DEVICE_MULTIPLE);
+        $this->ModifyFormElement($form['elements'], 'DeviceVariable', function (array &$element) use ($number): void
+        {
+            $element['visible'] = ($number === self::DEVICE_ONE);
+        });
 
         // device list (set status column)
         $variables = json_decode($this->ReadPropertyString('DeviceVariables'), true);
-        foreach ($variables as $variable) {
-            $form['elements'][4]['items'][2]['values'][] = [
-                'Status' => $this->GetVariableStatus($variable['VariableID']),
-            ];
-        }
+        $this->ModifyFormElement($form['elements'], 'DeviceVariables', function (array &$element) use ($number, $variables): void
+        {
+            $element['visible'] = ($number === self::DEVICE_MULTIPLE);
+            foreach ($variables as $variable) {
+                $element['values'][] = [
+                    'Status' => $this->GetVariableStatus((int) $variable['VariableID']),
+                ];
+            }
+        });
 
         // return form
         return json_encode($form);
@@ -252,6 +296,20 @@ class TimerSwitch extends IPSModuleStrict
         //Never delete this line!
         parent::ApplyChanges();
 
+        // Wait for kernel start (Location Control and devices must be loaded)
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return;
+        }
+
+        // Next switching times (reset, CalculateTimer sets the valid values)
+        $next = $this->ReadPropertyBoolean('SettingsNext');
+        $this->MaintainVariable('NextOn', $this->Translate('Next switch on'), VARIABLETYPE_INTEGER, self::LTM_PRESENTATION_NEXT, 1, $next);
+        $this->MaintainVariable('NextOff', $this->Translate('Next switch off'), VARIABLETYPE_INTEGER, self::LTM_PRESENTATION_NEXT, 2, $next);
+        if ($next) {
+            $this->SetValueInteger('NextOn', 0);
+            $this->SetValueInteger('NextOff', 0);
+        }
+
         //Delete all references in order to readd them
         foreach ($this->GetReferenceList() as $referenceID) {
             $this->UnregisterReference($referenceID);
@@ -280,23 +338,23 @@ class TimerSwitch extends IPSModuleStrict
         $number = $this->ReadPropertyInteger('DeviceNumber');
         if ($number == self::DEVICE_ONE) {
             //Create one trigger
-            if (IPS_VariableExists($variable)) {
+            if ($this->GetVariableStatus($variable) === 'OK') {
                 $this->RegisterMessage($variable, VM_UPDATE);
             } else {
-                $this->SetStatus(104);
+                $this->SetStatus(205);
                 return;
             }
         } else {
             //Create multiple trigger
             $ok = 0;
             foreach ($variables as $variable) {
-                if ($this->GetVariableStatus($variable['VariableID']) == 'OK') {
+                if ($this->GetVariableStatus((int) $variable['VariableID']) === 'OK') {
                     $ok++;
                 }
             }
             //If we are missing triggers or devices will not work
             if ((empty($variables)) || ($ok != count($variables))) {
-                $this->SetStatus(104);
+                $this->SetStatus(205);
                 return;
             }
             //Register update messages
@@ -312,14 +370,14 @@ class TimerSwitch extends IPSModuleStrict
             return;
         }
 
-        // Safty Check Seperators
+        // Safety Check Separators
         $start = $this->ReadPropertyString('TimingStart');
-        if ($start == self::TIMING_SEPERATOR) {
+        if ($start == self::TIMING_SEPARATOR) {
             $this->SetStatus(201);
             return;
         }
         $end = $this->ReadPropertyString('TimingEnd');
-        if ($end == self::TIMING_SEPERATOR) {
+        if ($end == self::TIMING_SEPARATOR) {
             $this->SetStatus(202);
             return;
         }
@@ -339,6 +397,10 @@ class TimerSwitch extends IPSModuleStrict
             $cs = 0;
         } else {
             $cs = $this->GetLocationID($start);
+            if ($cs === 0) {
+                $this->SetStatus(204);
+                return;
+            }
         }
 
         // Get End ID
@@ -348,6 +410,10 @@ class TimerSwitch extends IPSModuleStrict
             $ce = 0;
         } else {
             $ce = $this->GetLocationID($end);
+            if ($ce === 0) {
+                $this->SetStatus(204);
+                return;
+            }
         }
 
         // Write
@@ -374,7 +440,7 @@ class TimerSwitch extends IPSModuleStrict
         $this->WriteAttributeInteger('ConditionalTime', $ct);
         $this->LogDebug(__FUNCTION__, 'ConditionalTime = ' . $ct);
 
-        // Aditionally Switch
+        // Additional Switch
         $switch = $this->ReadPropertyBoolean('SettingsSwitch');
         $this->MaintainVariable('switch_proxy', $this->Translate('Switch'), VARIABLETYPE_BOOLEAN, self::LTM_PRESENTATION_SWITCH, 0, $switch);
         if ($switch) {
@@ -406,33 +472,23 @@ class TimerSwitch extends IPSModuleStrict
      */
     public function MessageSink(int $timestamp, int $sender, int $message, array $data): void
     {
-        // $this->LogDebug(__FUNCTION__, 'Sender: '. $sender . 'Data: ' . print_r($data, true), 0);
         switch ($message) {
+            case IPS_KERNELSTARTED:
+                $this->ApplyChanges();
+                break;
             case VM_UPDATE:
-                $vid = 0;
-                // Extract vars
-                $number = $this->ReadPropertyInteger('DeviceNumber');
-                if ($number == self::DEVICE_ONE) {
-                    $vid = $this->ReadPropertyInteger('DeviceVariable');
-                } else {
-                    $variables = json_decode($this->ReadPropertyString('DeviceVariables'), true);
-                    foreach ($variables as $variable) {
-                        if ($variable['VariableID'] == $sender) {
-                            $vid = $sender;
-                        }
-                    }
+                if (!$data[1]) {
+                    break;
                 }
                 $sid = $this->ReadAttributeInteger('ConditionalStart');
                 $eid = $this->ReadAttributeInteger('ConditionalEnd');
-                // Safety Check
-                if (($sender != $vid) || ($sender != $sid) || ($sender != $eid)) {
-                    if (($sender == $vid) && ($data[1] == true)) {
-                        $this->LogDebug(__FUNCTION__, $sender . ': device variable changed');
-                        $this->SwitchState($data[0]);
-                    } elseif ($data[1] == true) {
-                        $this->LogDebug(__FUNCTION__, $sender . ': conditional start changed');
-                        $this->Schedule($sender);
-                    }
+                if (in_array($sender, $this->GetDeviceVariables(), true)) {
+                    $this->LogDebug(__FUNCTION__, $sender . ': device variable changed');
+                    $this->SwitchState((bool) $data[0]);
+                } elseif (($sender === $sid) || ($sender === $eid)) {
+                    $this->LogDebug(__FUNCTION__, $sender . ': conditional variable changed');
+                    // Schedule identifies conditional triggers by comparing the value with the start/end variable ID
+                    $this->Schedule($sender);
                 } else {
                     $this->LogDebug(__FUNCTION__, $sender . ' unknown!');
                 }
@@ -451,22 +507,38 @@ class TimerSwitch extends IPSModuleStrict
     public function RequestAction(string $ident, mixed $value): void
     {
         // Debug output
-        $this->LogDebug(__FUNCTION__, $ident . ' => ' . $value);
+        $this->LogDebug(__FUNCTION__, $ident . ' => ' . var_export($value, true));
         switch ($ident) {
             case 'switch_proxy':
-                if ($this->SwitchDevice($value)) {
-                    $this->SetValueBoolean($ident, $value);
+                if ($this->SwitchDevice((bool) $value)) {
+                    $this->SetValueBoolean($ident, (bool) $value);
                 }
                 break;
+            case 'TestSwitch':
+                if ($this->SwitchDevice((bool) $value)) {
+                    $this->SwitchState((bool) $value);
+                } else {
+                    echo $this->Translate('One or more devices could not be switched!');
+                }
+                break;
+            case 'OnDeviceNumber':
+            case 'OnTimingStart':
+            case 'OnTimingEnd':
+            case 'OnStartDelete':
+            case 'OnEndDelete':
+            case 'OnStartCopy':
+            case 'OnEndCopy':
+                $this->$ident((string) $value);
+                break;
             default:
-                eval('$this->' . $ident . '(\'' . $value . '\');');
+                $this->LogDebug(__FUNCTION__, 'Unknown ident: ' . $ident);
         }
     }
 
     /**
      * Schedule
      *
-     * @param integer $value Action value (ON=1, OFF=2)
+     * @param int $value Action value (ON=1, OFF=2)
      *
      * @return void
      */
@@ -481,13 +553,11 @@ class TimerSwitch extends IPSModuleStrict
 
         // Start is OFF
         if (($cs == -1) && ($value == self::SCHEDULE_ON)) {
-            // never happend!!!!
             $this->LogDebug(__FUNCTION__, 'Start Trigger is off');
             return;
         }
         // End is OFF
         if (($ce == -1) && ($value == self::SCHEDULE_OFF)) {
-            // never happend!!!!
             $this->LogDebug(__FUNCTION__, 'End Trigger is off');
             return;
         }
@@ -499,10 +569,10 @@ class TimerSwitch extends IPSModuleStrict
             // Check was OFF before ON (only for conditional timing setup, means ce is set)
             if ($ct > 0 && $ce > 0) {
                 $mid = mktime(24, 0, 0);
-                $int = GetValue($ce);
+                $int = (int) GetValue($ce);
                 $this->LogDebug(__FUNCTION__, 'Check was OFF before ON: ' . $mid . ' < ' . $int);
                 if ($mid < $int) {
-                    $this->LogDebug(__FUNCTION__, 'OFF wass before ON: ' . boolval($mid < $int));
+                    $this->LogDebug(__FUNCTION__, 'OFF was before ON: ' . var_export($mid < $int, true));
                     $switch = false;
                 }
             }
@@ -530,10 +600,10 @@ class TimerSwitch extends IPSModuleStrict
                 $buf = $this->GetBuffer('schedule');
                 $lts = explode(':', $buf);
                 $mid = mktime(24, 0, 0);
-                $int = $lts[1];
+                $int = (int) ($lts[1] ?? 0);
                 $this->LogDebug(__FUNCTION__, 'Check was OFF before ON: ' . $mid . ' < ' . $int);
                 if ($mid < $int) {
-                    $this->LogDebug(__FUNCTION__, 'OFF was before ON: ' . boolval($mid < $int));
+                    $this->LogDebug(__FUNCTION__, 'OFF was before ON: ' . var_export($mid < $int, true));
                     $switch = false;
                 }
             }
@@ -557,7 +627,7 @@ class TimerSwitch extends IPSModuleStrict
     }
 
     /**
-     * User has select an new number of devices.
+     * User has selected a new number of devices.
      *
      * @param string $value The selected value.
      *
@@ -571,7 +641,7 @@ class TimerSwitch extends IPSModuleStrict
     }
 
     /**
-     * User has select an new start trigger.
+     * User has selected a new start trigger.
      *
      * @param string $value The selected value.
      *
@@ -580,30 +650,30 @@ class TimerSwitch extends IPSModuleStrict
     protected function OnTimingStart(string $value): void
     {
         $this->LogDebug(__FUNCTION__, 'Value: ' . $value);
-        if ($value == self::TIMING_SEPERATOR) {
+        if ($value == self::TIMING_SEPARATOR) {
             $this->UpdateFormField(self::TIMING_START, 'value', self::TIMING_OFF);
         }
         $this->WeeklySchedule(self::TIMING_START, ($value == self::TIMING_WEEKLYON));
     }
 
     /**
-     * User has select an new end trigger.
+     * User has selected a new end trigger.
      *
      * @param string $value The selected value.
      *
      * @return void
      */
-    protected function OnTimingEnd(string $value)
+    protected function OnTimingEnd(string $value): void
     {
         $this->LogDebug(__FUNCTION__, 'Value: ' . $value);
-        if ($value == self::TIMING_SEPERATOR) {
+        if ($value == self::TIMING_SEPARATOR) {
             $this->UpdateFormField(self::TIMING_END, 'value', self::TIMING_OFF);
         }
         $this->WeeklySchedule(self::TIMING_END, ($value == self::TIMING_WEEKLYOFF));
     }
 
     /**
-     * User has clickt on start delete button.
+     * User has clicked on start delete button.
      *
      * @param string $name The button field name.
      *
@@ -616,7 +686,7 @@ class TimerSwitch extends IPSModuleStrict
     }
 
     /**
-     * User has clickt on end delete button.
+     * User has clicked on end delete button.
      *
      * @param string $name The button field name.
      *
@@ -629,7 +699,7 @@ class TimerSwitch extends IPSModuleStrict
     }
 
     /**
-     * User has clickt on start copy button.
+     * User has clicked on start copy button.
      *
      * @param string $value The copy value.
      *
@@ -645,7 +715,7 @@ class TimerSwitch extends IPSModuleStrict
     }
 
     /**
-     * User has clickt on end copy button.
+     * User has clicked on end copy button.
      *
      * @param string $value The copy value.
      *
@@ -663,7 +733,7 @@ class TimerSwitch extends IPSModuleStrict
     /**
      * Switch device state.
      *
-     * @param boolean $state True for ON, otherwise OFF.
+     * @param bool $state True for ON, otherwise OFF.
      *
      * @return void
      */
@@ -679,13 +749,12 @@ class TimerSwitch extends IPSModuleStrict
     /**
      * Switch Variable/Script
      *
-     * @param boolean $state ON/OFF.
+     * @param bool $state ON/OFF.
      *
      * @return bool True if switch successful, otherwise false.
      */
-    private function SwitchDevice($state): bool
+    private function SwitchDevice(bool $state): bool
     {
-        $ret = true;
         $this->LogDebug(__FUNCTION__, 'New State: ' . var_export($state, true));
 
         // Check Script
@@ -693,46 +762,62 @@ class TimerSwitch extends IPSModuleStrict
         if ($ds != 0) {
             if (IPS_ScriptExists($ds)) {
                 $rs = IPS_RunScriptEx($ds, ['State' => $state]);
-                $this->LogDebug(__FUNCTION__, 'RundScript: ' . $rs);
+                $this->LogDebug(__FUNCTION__, 'RunScript: ' . $rs);
             } else {
-                $this->LogDebug(__FUNCTION__, 'Script #' . $ds . ' doesnt exist!');
+                $this->LogDebug(__FUNCTION__, 'Script #' . $ds . ' does not exist!');
             }
         }
 
-        // Check Variable
-        $number = $this->ReadPropertyInteger('DeviceNumber');
-        if ($number == self::DEVICE_ONE) {
-            $dv = $this->ReadPropertyInteger('DeviceVariable');
-            if ($dv != 0) {
-                $ret = @RequestAction($dv, boolval($state));
-                if ($ret === false) {
-                    $this->LogDebug(__FUNCTION__, 'Device #' . $dv . ' could not be switched by RequestAction!');
-                    $ret = @SetValueBoolean($dv, boolval($state));
-                    if ($ret === false) {
-                        $this->LogDebug(__FUNCTION__, 'Device could not be switched by Boolean!');
-                    }
-                }
-                if ($ret === false) {
-                    $this->LogMessage('Device could not be switched (UNREACH)!');
-                    return false;
-                }
+        // Check Variables
+        $ret = true;
+        foreach ($this->GetDeviceVariables() as $vid) {
+            if (IPS_VariableExists($vid) && HasAction($vid)) {
+                $ok = (@RequestAction($vid, $state) !== false);
+            } elseif (IPS_VariableExists($vid) && $this->IsDirectSwitchable($vid)) {
+                $ok = @SetValueBoolean($vid, $state);
+            } else {
+                $ok = false;
             }
-            return $ret;
+            if (!$ok) {
+                $this->LogDebug(__FUNCTION__, 'Device #' . $vid . ' could not be switched!');
+                $ret = false;
+            }
+        }
+        if ($ret === false) {
+            $this->LogMessage('One or more devices could not be switched!', KL_WARNING);
+        }
+        return $ret;
+    }
+
+    /**
+     * Returns the configured device variables (one or multiple).
+     *
+     * @return array<int,int> Variable IDs
+     */
+    private function GetDeviceVariables(): array
+    {
+        if ($this->ReadPropertyInteger('DeviceNumber') == self::DEVICE_ONE) {
+            $ids = [$this->ReadPropertyInteger('DeviceVariable')];
         } else {
             $variables = json_decode($this->ReadPropertyString('DeviceVariables'), true);
-            $ret = true;
-            foreach ($variables as $variable) {
-                $ret = @RequestAction($variable['VariableID'], boolval($state));
-                if ($ret === false) {
-                    $this->LogDebug(__FUNCTION__, 'Device #' . $variable['VariableID'] . ' could not be switched by RequestAction!');
-                    $ret = false;
-                }
-            }
-            if ($ret === false) {
-                $this->LogMessage('One or more devices could not be switched!');
-            }
-            return $ret;
+            $ids = array_map(fn (array $variable): int => (int) ($variable['VariableID'] ?? 0), is_array($variables) ? $variables : []);
         }
+        return array_values(array_filter($ids, fn (int $id): bool => $id > 0));
+    }
+
+    /**
+     * Checks whether a variable without action may be set directly.
+     * Only allowed by the user and only for boolean variables which do not belong to an instance.
+     *
+     * @param int $vid Variable ID
+     *
+     * @return bool True if the value may be set directly
+     */
+    private function IsDirectSwitchable(int $vid): bool
+    {
+        return $this->ReadPropertyBoolean('SettingsDirect')
+            && (IPS_GetVariable($vid)['VariableType'] === VARIABLETYPE_BOOLEAN)
+            && !IPS_InstanceExists(IPS_GetParent($vid));
     }
 
     /**
@@ -754,21 +839,7 @@ class TimerSwitch extends IPSModuleStrict
             return $this->Translate('Bool/Int/Float required');
         }
 
-        if ($var['VariableType'] === VARIABLETYPE_BOOLEAN) {
-            $profile = $var['VariableCustomProfile'] !== ''
-                ? $var['VariableCustomProfile']
-                : $var['VariableProfile'];
-
-            if (!IPS_VariableProfileExists($profile)) {
-                return $this->Translate('Profile required');
-            }
-        }
-
-        $action = $var['VariableCustomAction'] !== 0
-            ? $var['VariableCustomAction']
-            : $var['VariableAction'];
-
-        if ($action <= self::IPS_MIN_ID) {
+        if (!HasAction($vid) && !$this->IsDirectSwitchable($vid)) {
             return $this->Translate('Action required');
         }
 
@@ -776,11 +847,11 @@ class TimerSwitch extends IPSModuleStrict
     }
 
     /**
-     * Returns the status variablen ID of the Location Control by given ident.
+     * Returns the status variable ID of the Location Control by given ident.
      *
      * @param string $ident Ident of the Location Control Variable
      *
-     * @return integer Variablen ID
+     * @return int Variable ID
      */
     private function GetLocationID(string $ident): int
     {
@@ -822,95 +893,78 @@ class TimerSwitch extends IPSModuleStrict
         $start = $this->ReadPropertyString('TimingStart');
         $end = $this->ReadPropertyString('TimingEnd');
         $this->LogDebug(__FUNCTION__, 'Start: ' . $start . ' End: ' . $end);
-        // buffer setup
-        $ts = 0;
-        $te = 0;
         // Disable Timer
         $this->SetTimerInterval('ScheduleTimerOn', 0);
         $this->SetTimerInterval('ScheduleTimerOff', 0);
         // New Timer
-        $day = date('N', time()) - 1;
         $now = time();
-        $add = 0;
+        $ts = 0;
+        $te = 0;
         if ($start == self::TIMING_WEEKLYON) {
-            $active = false;
-            for ($i = $day; $i <= 6; $i++) {
-                $active = $this->ReadPropertyBoolean('TimingStartCheck' . self::SCHEDULE_DAYS[$i]);
-                if ($active) {
-                    $time = $this->ReadPropertyString('TimingStartTime' . self::SCHEDULE_DAYS[$i]);
-                    $time = json_decode($time, true);
-                    $next = mktime($time['hour'], $time['minute'], $time['second']) + ($add * 86400);
-                    if ($next > $now) {
-                        $ts = $next - $now;
-                        $this->SetTimerInterval('ScheduleTimerOn', $ts * 1000);
-                        break;
-                    } else {
-                        $active = false;
-                    }
-                }
-                $add++;
-            }
-            // if no day behind active, then look before
-            if (!$active) {
-                for ($i = 0; $i < $day; $i++) {
-                    $active = $this->ReadPropertyBoolean('TimingStartCheck' . self::SCHEDULE_DAYS[$i]);
-                    if ($active) {
-                        $time = $this->ReadPropertyString('TimingStartTime' . self::SCHEDULE_DAYS[$i]);
-                        $time = json_decode($time, true);
-                        $next = mktime($time['hour'], $time['minute'], $time['second']) + ($add * 86400);
-                        if ($next > $now) {
-                            $ts = $next - $now;
-                            $this->SetTimerInterval('ScheduleTimerOn', $ts * 1000);
-                            break;
-                        } else {
-                            $active = false;
-                        }
-                    }
-                    $add++;
-                }
+            $ts = $this->NextWeeklyTime(self::TIMING_START, $now);
+            if ($ts > 0) {
+                $this->SetTimerInterval('ScheduleTimerOn', ($ts - $now) * 1000);
             }
         }
-        $add = 0;
         if ($end == self::TIMING_WEEKLYOFF) {
-            $active = false;
-            for ($i = $day; $i <= 6; $i++) {
-                $active = $this->ReadPropertyBoolean('TimingEndCheck' . self::SCHEDULE_DAYS[$i]);
-                if ($active) {
-                    $time = $this->ReadPropertyString('TimingEndTime' . self::SCHEDULE_DAYS[$i]);
-                    $time = json_decode($time, true);
-                    $next = mktime($time['hour'], $time['minute'], $time['second']) + ($add * 86400);
-                    if ($next > $now) {
-                        $te = $next - $now;
-                        $this->SetTimerInterval('ScheduleTimerOff', $te * 1000);
-                        break;
-                    } else {
-                        $active = false;
-                    }
-                }
-                $add++;
-            }
-            // if no day behind active, thern look before
-            if (!$active) {
-                for ($i = 0; $i < $day; $i++) {
-                    $active = $this->ReadPropertyBoolean('TimingEndCheck' . self::SCHEDULE_DAYS[$i]);
-                    if ($active) {
-                        $time = $this->ReadPropertyString('TimingEndTime' . self::SCHEDULE_DAYS[$i]);
-                        $time = json_decode($time, true);
-                        $next = mktime($time['hour'], $time['minute'], $time['second']) + ($add * 86400);
-                        if ($next > $now) {
-                            $te = $next - $now;
-                            $this->SetTimerInterval('ScheduleTimerOff', $te * 1000);
-                            break;
-                        } else {
-                            $active = false;
-                        }
-                    }
-                    $add++;
-                }
+            $te = $this->NextWeeklyTime(self::TIMING_END, $now);
+            if ($te > 0) {
+                $this->SetTimerInterval('ScheduleTimerOff', ($te - $now) * 1000);
             }
         }
-        $this->SetBuffer('schedule', ($ts > 0 ? $ts + $now : 0) . ':' . ($te > 0 ? $te + $now : 0));
+        $this->SetBuffer('schedule', $ts . ':' . $te);
         $this->LogDebug(__FUNCTION__, 'Buffer: ' . $this->GetBuffer('schedule'));
+        // Next switching times
+        if ($this->ReadPropertyBoolean('SettingsNext')) {
+            $this->SetValueInteger('NextOn', $this->NextSwitchTime($this->ReadAttributeInteger('ConditionalStart'), $ts));
+            $this->SetValueInteger('NextOff', $this->NextSwitchTime($this->ReadAttributeInteger('ConditionalEnd'), $te));
+        }
+    }
+
+    /**
+     * Returns the next switching time of a trigger.
+     *
+     * @param int $id Conditional ID (-1 = off, 0 = weekly schedule, otherwise Location Control variable)
+     * @param int $weekly Next time of the weekly schedule
+     *
+     * @return int Timestamp of the next switching time, 0 if unknown
+     */
+    private function NextSwitchTime(int $id, int $weekly): int
+    {
+        if ($id === 0) {
+            return $weekly;
+        }
+        // Location Control variables jump to the next occurrence at the time of the event
+        if (($id > 0) && IPS_VariableExists($id)) {
+            return (int) GetValue($id);
+        }
+        return 0;
+    }
+
+    /**
+     * Returns the next active switching time of the weekly schedule (today up to the same day next week).
+     *
+     * @param string $prefix Schedule prefix (TimingStart or TimingEnd)
+     * @param int $now Current timestamp
+     *
+     * @return int Timestamp of the next switching time, 0 if no day is active
+     */
+    private function NextWeeklyTime(string $prefix, int $now): int
+    {
+        $today = (int) date('N', $now) - 1;
+        for ($add = 0; $add <= 7; $add++) {
+            $day = self::SCHEDULE_DAYS[($today + $add) % 7];
+            if (!$this->ReadPropertyBoolean($prefix . 'Check' . $day)) {
+                continue;
+            }
+            $time = json_decode($this->ReadPropertyString($prefix . 'Time' . $day), true);
+            // Day offset via mktime keeps the wall clock time across DST changes
+            $next = mktime($time['hour'], $time['minute'], $time['second'], (int) date('n', $now), (int) date('j', $now) + $add, (int) date('Y', $now));
+            if ($next > $now) {
+                return $next;
+            }
+        }
+        return 0;
     }
 
     /**

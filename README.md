@@ -2,8 +2,8 @@
 
 [![Home](https://img.shields.io/badge/Home-wilkware.de-0b1830.svg?style=flat-square)](https://wilkware.de/module/zeitschaltuhr/)
 [![Version](https://img.shields.io/badge/Symcon-PHP--Modul-red.svg?style=flat-square)](https://www.symcon.de/service/dokumentation/entwicklerbereich/sdk-tools/sdk-php/)
-[![Product](https://img.shields.io/badge/Symcon%20Version-6.4-blue.svg?style=flat-square)](https://www.symcon.de/produkt/)
-[![Version](https://img.shields.io/badge/Modul%20Version-3.1.20250212-orange.svg?style=flat-square)](https://github.com/Wilkware/TimerSwitch)
+[![Product](https://img.shields.io/badge/Symcon%20Version-8.1-blue.svg?style=flat-square)](https://www.symcon.de/produkt/)
+[![Version](https://img.shields.io/badge/Modul%20Version-4.0.20261102-orange.svg?style=flat-square)](https://github.com/Wilkware/TimerSwitch)
 [![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-green.svg?style=flat-square)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 [![Actions](https://img.shields.io/github/actions/workflow/status/wilkware/TimerSwitch/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/Wilkware/TimerSwitch/actions)
 
@@ -39,14 +39,15 @@ Das nur um einige Anregungen zu geben. Wahrscheinlich gibt es da noch einiges me
   3. Wochenplan => Steuerung über Zeitplan
   4. Offset => frei definierbare Zeitpunkte über das Location Control
 * Zusätzlich bzw. ausschließlich kann ein Skript ausgeführt werden.
-* Schaltvariable muss nicht eine Aktionsvariable sein, sondern kann auch einfach eine boolesche Variable sein.
+* Schaltvariablen werden über ihre Aktion geschaltet; boolesche Variablen ohne Aktion (die zu keiner Instanz gehören) können optional direkt gesetzt werden.
+* Integer- bzw. Float-Variablen werden mit 1 (An) bzw. 0 (Aus) geschaltet.
 * Option das Einschalten nur zu erlauben, wenn sich die Zeiten nicht überschneiden (zeitlich korrekte Abfolge, AN-vor-AUS).
 * Statusvariable als Proxy-Schalter, z.B. für Verwendung im WebFront.
 * Schalten kann über mehrere Tage hinweg organisiert werden (gezielter Einsatz des täglichen Zeitplanes).
 
 ### 2. Voraussetzungen
 
-* Symcon ab Version 6.4
+* Symcon ab Version 8.1
 
 ### 3. Installation
 
@@ -62,13 +63,13 @@ __Konfigurationsseite__:
 
 Einstellungsbereich:
 
-> Schaltung ...
+> 🎚️ Schaltung ...
 
 Name                  | Beschreibung
 --------------------- | ---------------------------------
 An /Aus               | Schalter zum Aktivieren bzw. Deaktivieren der gesamten Schaltung, z.B. Weihnachtsbeleuchtung nur im Winter ;-)
 
-> Zeitsteuerung ...
+> ⏰ Zeitsteuerung ...
 
 Name                  | Beschreibung
 --------------------- | ---------------------------------
@@ -76,31 +77,44 @@ Auslöser Einschalten  | Auswahlmöglichkeiten: Aus; Sonnenaufgang oder -unterga
 Auslöser Ausschalten  | Auswahlmöglichkeiten: ; Sonnenaufgang oder -untergang; zivile, nautische oder astronomische Dämmerung; Wochenplan (Aus); Offsets
 (Zeitplan)            | Hinterlegung einer täglichen Uhrzeit für AN & AUS (Montag - Sonntag)
 
-> Geräte ...
+> 💡 Geräte ...
 
 Name                  | Beschreibung
 --------------------- | ---------------------------------
 Geräteanzahl          | Auswahl bzw. Umschalter zwischen einzelnen und mehreren Geräten
 Schaltvariable        | Schalt(Aktions-)variable (ein Gerät)
 Schaltvariablen       | Liste von Geräten (mehrere Geräte)
-Skript                | Auszuführendes Skript (Status true/false wird als Array 'State' übergeben)
 
-> Einstellungen ...
+> ⚙️ Erweiterte Einstellungen ...
 
 Name                  | Beschreibung
 --------------------- | ---------------------------------
 Schaltvariable nur ein- bzw. ausschalten wenn zeitliche Abfolge korrekt ist (nur in Verbindung mit einem Wochenplan)! | true/false
 Zusätzlich noch eine normale Schaltervariable anlegen (z.B. für Webfront)? | true/false
+Variablen für die nächsten Schaltzeitpunkte anlegen? | true/false; legt die Statusvariablen 'Nächstes Einschalten' und 'Nächstes Ausschalten' an
+Schaltvariablen ohne Aktion direkt setzen (nur Variablen, die zu keiner Instanz gehören)? | true/false (Standard: false); Variablen mit Aktion werden immer über RequestAction geschaltet
+Skript | Gleichzeitig auszuführendes Skript (Status true/false wird als Array 'State' übergeben)
+
+Aktionsbereich:
+
+> 🧪 Test ...
+
+Name                  | Beschreibung
+--------------------- | ---------------------------------
+Jetzt einschalten     | Schaltet die konfigurierten Geräte (und das Skript) sofort ein
+Jetzt ausschalten     | Schaltet die konfigurierten Geräte (und das Skript) sofort aus
 
 ### 5. Statusvariablen
 
 Die Statusvariablen werden automatisch angelegt. Das Löschen einzelner kann zu Fehlfunktionen führen.
 
-Name                 | Typ     | Beschreibung
--------------------- | ------- | ------------------------------
-Schalter             | Boolean | Proxy-Schalter zum direkten Schalten der Geräte (z.B. für die Visualisierung)
+Ident                | Name                 | Typ     | Beschreibung
+-------------------- | -------------------- | ------- | ------------------------------
+switch_proxy         | Schalter             | Boolean | Proxy-Schalter zum direkten Schalten der Geräte (z.B. für die Visualisierung)
+NextOn               | Nächstes Einschalten | Integer | Zeitpunkt des nächsten Einschaltens (0 = kein Zeitpunkt, z.B. Auslöser Aus oder Instanz inaktiv)
+NextOff              | Nächstes Ausschalten | Integer | Zeitpunkt des nächsten Ausschaltens (0 = kein Zeitpunkt, z.B. Auslöser Aus oder Instanz inaktiv)
 
-_Hinweis:_ Die Variable wird nur angelegt, wenn in den Einstellungen die zusätzliche Schaltervariable aktiviert ist.
+_Hinweis:_ Die Variablen werden nur angelegt, wenn sie in den erweiterten Einstellungen aktiviert sind.
 
 ### 6. Darstellungen
 
@@ -109,6 +123,8 @@ Die Darstellungen werden direkt an den Statusvariablen hinterlegt, es werden kei
 Variable             | Darstellung   | Werte
 -------------------- | ------------- | ------------------------------
 Schalter             | Schalter      | An / Aus
+Nächstes Einschalten | Datum/Uhrzeit | Wochentag, Tag und Monat, Stunden und Minuten
+Nächstes Ausschalten | Datum/Uhrzeit | Wochentag, Tag und Monat, Stunden und Minuten
 
 ### 7. Visualisierung
 
@@ -118,7 +134,30 @@ Es ist keine weitere Steuerung oder gesonderte Darstellung integriert.
 
 Ein direkter Aufruf von öffentlichen Funktionen ist nicht notwendig!
 
+```php
+void LTM_Schedule(int $InstanzID, int $Value);
+```
+
+Führt die Schaltung wie der interne Zeitplan aus (1 = Einschalten, 2 = Ausschalten). Die Funktion wird von den Timern des Moduls aufgerufen.
+
 ### 9. Versionshistorie
+
+v4.0.20261102
+
+* _NEU_: Option zum direkten Setzen von Schaltvariablen ohne Aktion (Erweiterte Einstellungen)
+* _NEU_: Kompatibilität auf Symcon 8.1 hoch gesetzt
+* _NEU_: Optionale Statusvariablen für den nächsten Ein- und Ausschaltzeitpunkt
+* _NEU_: Testbereich zum direkten Ein- und Ausschalten im Konfigurationsformular
+* _NEU_: Konfigurationsformular auf Standardstruktur umgestellt (Skript unter Erweiterte Einstellungen)
+* _NEU_: Eigene Statusmeldungen für fehlendes Location Control bzw. ungültige Schaltvariablen
+* _FIX_: Wochenplan mit nur einem aktiven Tag schaltete nur einmal
+* _FIX_: Wochenplan bei Sommer-/Winterzeitumstellung um eine Stunde verschoben
+* _FIX_: Fehler bei Integer-/Float-Schaltvariablen behoben
+* _FIX_: Fehlerhafte Rückmeldung beim Schalten mehrerer Geräte behoben
+* _FIX_: Initialisierung erst nach vollständigem Systemstart
+* _FIX_: Variablen mit Darstellung statt Profil werden akzeptiert
+* _FIX_: Uhrzeitfelder des Wochenplans werden beim Wechsel des Auslösers korrekt (de)aktiviert
+* _FIX_: Bestehende Instanzen mit einer Schaltvariable ohne Aktion schalten weiterhin direkt (Migration)
 
 v3.1.20250212
 * _NEU_: Einstellungsmöglichkeiten um Offset-Variablen aus dem Location Control erweitert
